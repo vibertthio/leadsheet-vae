@@ -1,4 +1,5 @@
 import LatentGraph from './latent-graph';
+import PianorollGrid from './pianoroll-grid';
 import NN from './nn';
 import { Noise } from 'noisejs';
 
@@ -11,6 +12,12 @@ export default class Renderer {
   constructor(app, canvas) {
     this.app = app;
     this.canvas = canvas;
+    this.chords = [];
+    this.fontSize = 1.0;
+    this.playing = true;
+    this.pianorollGrid = new PianorollGrid(this, -1.3);;
+
+
     this.matrix = [];
     this.latent = [];
     this.latentDisplay = [];
@@ -21,7 +28,7 @@ export default class Renderer {
     this.frameCount = 0;
     this.halt = true;
 
-    // this.backgroundColor = 'rgba(37, 38, 35, 1.0)';
+
     this.backgroundColor = 'rgba(15, 15, 15, 1.0)';
     this.noteOnColor = 'rgba(255, 255, 255, 1.0)';
     this.mouseOnColor = 'rgba(150, 150, 150, 1.0)';
@@ -29,9 +36,14 @@ export default class Renderer {
     this.redColor = this.noteOnCurrentColor;
     this.whiteColor = this.noteOnColor;
     this.boxColor = 'rgba(200, 200, 200, 1.0)';
+    this.darkColor = 'rgba(30, 30, 30, 1.0)';
+    this.greenColor = '#00b894';
+
+
     this.extendAlpha = 0;
-    this.currentUpdateDir = 0;
     this.selectedLatent = 20;
+    this.displayWidth = 0;
+
 
     this.gridWidth = 0;
     this.gridHeight = 0;
@@ -94,7 +106,7 @@ export default class Renderer {
       }
     }
 
-    for (let i = 0; i < 32; i += 1) {
+    for (let i = 0; i < this.latentGraph.dims; i += 1) {
       this.latent[i] = 0;
       this.latentDisplay[i] = 0;
       for (let j = 0; j < 3; j += 1) {
@@ -126,7 +138,7 @@ export default class Renderer {
     this.matrix = mat;
   }
 
-  draw(scr, b) {
+  draw(scr, sectionIndex = 0, barIndex = 0, b = 0) {
 
     if (this.halt) {
       if (this.frameCount % 5 == 0) {
@@ -136,7 +148,7 @@ export default class Renderer {
     this.frameCount += 1;
     this.beat = b;
     const ctx = this.canvas.getContext('2d');
-    ctx.font = '1rem monospace';
+    ctx.font = '1.0rem monospace';
     this.width = scr.width;
     this.height = scr.height;
     const width = scr.width;
@@ -155,10 +167,9 @@ export default class Renderer {
     this.gridYShift = -h * 1.5 ;
 
     ctx.translate(width * 0.5, height * 0.5);
-
+    this.pianorollGrid.draw(ctx, w * 0.9, h * 1.2);
     this.drawVAE(ctx);
-
-    this.drawGrid(ctx, w, h);
+    // this.drawGrid(ctx, w, h);
     this.latentGraph.draw(ctx, this.latent, this.dist);
 
     if (this.showingLatents) {
@@ -287,7 +298,7 @@ export default class Renderer {
   handleLatentGraphClick(x, y) {
     const { graphX, graphY } = this.latentGraph;
     const r = Math.pow(this.dist, 2);
-    const angle = 2 * Math.PI / 32;
+    const angle = 2 * Math.PI / this.latentGraph.dims;
 
     if (Math.pow(x - graphX, 2) + Math.pow(y - graphY, 2) < r * 1.2) {
       const xpos = x - graphX;
@@ -310,7 +321,8 @@ export default class Renderer {
 
     return [
       this.handleLatentGraphClick(cx, cy),
-      this.handleMouseDownOnGrid(),
+      false,
+      // this.handleMouseDownOnGrid(),
     ];
   }
 
@@ -337,21 +349,21 @@ export default class Renderer {
 
   handleMouseMove(e) {
     this.latentGraph.handleMouseMove(e);
-    const x = e.clientX - (this.width * 0.5 + this.gridXShift - this.gridWidth * 0.5);
-    const y = e.clientY - (this.height * 0.5 + this.gridYShift - this.gridHeight * 0.5);
-    const w = this.gridWidth;
-    const h = this.gridHeight;
-    const w_step = w / 96;
-    const h_step = h / 9;
+    // const x = e.clientX - (this.width * 0.5 + this.gridXShift - this.gridWidth * 0.5);
+    // const y = e.clientY - (this.height * 0.5 + this.gridYShift - this.gridHeight * 0.5);
+    // const w = this.gridWidth;
+    // const h = this.gridHeight;
+    // const w_step = w / 96;
+    // const h_step = h / 9;
 
-    if (x > 0 && x < w && y > 0 && y < h) {
-      const xpos = Math.floor(x / w_step);
-      const ypos = Math.floor(y / h_step);
-      this.mouseOnIndex = [xpos, ypos];
-      // console.log(`${xpos}, ${ypos}`);
-    } else {
-      this.mouseOnIndex = [-1, -1];
-    }
+    // if (x > 0 && x < w && y > 0 && y < h) {
+    //   const xpos = Math.floor(x / w_step);
+    //   const ypos = Math.floor(y / h_step);
+    //   this.mouseOnIndex = [xpos, ypos];
+    //   // console.log(`${xpos}, ${ypos}`);
+    // } else {
+    //   this.mouseOnIndex = [-1, -1];
+    // }
   }
 
   handleMouseDownOnGrid() {

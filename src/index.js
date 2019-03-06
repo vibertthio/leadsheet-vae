@@ -2,7 +2,8 @@ import React, { Component } from 'react';
 import { render } from 'react-dom';
 import styles from './index.module.scss';
 import info from './assets/info.png';
-import SamplesManager from './music/samples-manager';
+import SamplesManager from './samples/samples-manager';
+import Sound from './leadsheet/sound';
 import Renderer from './render/renderer';
 import playSvg from './assets/play.png';
 import pauseSvg from './assets/pause.png';
@@ -20,8 +21,9 @@ class App extends Component {
       playing: false,
       slash: true,
       dragging: false,
+      loading: true,
       loadingProgress: 0,
-      loadingSamples: true,
+      loadingSamples: false,
       currentTableIndex: 4,
       gate: 0.2,
       bpm: 120,
@@ -34,20 +36,21 @@ class App extends Component {
       },
     };
 
-    this.samplesManager = new SamplesManager((i) => {
-      this.handleLoadingSamples(i);
-    }),
+    this.samplesManager = new SamplesManager();
 
-      this.canvas = [];
+    this.sound = new Sound(this),
+    this.canvas = [];
     this.matrix = [];
-    this.rawMatrix = [];
+    this.chords = [];
+    this.tempMatrix = [];
     this.beat = 0;
+
     this.diffMatrix = [];
     this.diffAnimationAlpha = 0;
 
     this.serverUrl = 'http://musicai.citi.sinica.edu.tw/drumvae/';
-    // this.serverUrl = 'http://140.109.16.227:5002/';
-    // this.serverUrl = 'http://140.109.135.76:5010/';
+    this.leadsheetServerUrl = 'http://140.109.135.76:5001/';
+
 
     // animation
     this.TWEEN = TWEEN;
@@ -57,7 +60,7 @@ class App extends Component {
 
   componentDidMount() {
     this.renderer = new Renderer(this, this.canvas);
-    if (!this.state.loadingSamples) {
+    if (!this.state.loading) {
       this.renderer.draw(this.state.screen);
     }
     window.addEventListener('keydown', this.onKeyDown.bind(this), false);
@@ -68,7 +71,7 @@ class App extends Component {
     window.addEventListener('mouseup', this.handleMouseUp.bind(this));
 
     requestAnimationFrame(() => { this.update() });
-    this.getDrumVaeStatic();
+    this.getLeadsheetVaeStatic(false);
   }
 
   componentWillUnmount() {
@@ -82,52 +85,38 @@ class App extends Component {
 
 
   // Data control:
-  // 1. drum pattern(matrix)
-  // 2. latent vector
+
+  // Leadsheet
   changeMatrix(mat) {
-    if (mat) {
-      this.rawMatrix = mat;
-    }
-
-    const { gate } = this.state;
-    const m = this.rawMatrix.map(
-      c => c.map(x => (x > gate ? 1 : 0)
-    ));
-    this.tempMatrix = m;
-
-    this.diffMatrix = [];
-    if (this.matrix.length > 0) {
-      m.forEach((col, i) => {
-        col.forEach((x, j) => {
-          if (x !== this.matrix[i][j]) {
-            this.diffMatrix.push({i, j, value: x});
-          }
-        });
-      });
-    }
-
-    if (this.diffMatrix.length > 0) {
-      this.diffAnimation = new this.TWEEN.Tween({t : 0})
-        .easing(this.TWEEN.Easing.Exponential.Out)
-        .to({ t: 1 }, 500)
-        .onUpdate(obj => {
-          const { t } = obj;
-          this.diffAnimationAlpha = 1 - t;
-        });
-    }
+    this.tempMatrix = mat;
 
     if (!this.pauseChangeMatrix) {
       this.updateMatrix()
     }
   }
 
+  changeChords(c) {
+    this.tempChords = c;
+
+    if (!this.pauseChangeMatrix) {
+      this.updateChords();
+    }
+  }
+
   updateMatrix() {
-    // console.log('update matrix');
     const m = this.tempMatrix;
     this.matrix = m;
     this.renderer.changeMatrix(m);
-    this.samplesManager.changeMatrix(m);
+    this.sound.changeMatrix(m);
   }
+
+  updateChords() {
+    this.chords = this.tempChords;
+    this.sound.chords = this.tempChords;
+    this.renderer.chords = this.tempChords;
+  }
+
+
 
   changeLatent(latent) {
     if (this.pauseChangeLatent) {
@@ -140,9 +129,10 @@ class App extends Component {
 
 
   // Server
+  // Leadsheet
   // 1. GET
   // 2. POST
-  getDrumVae(url, restart = true, callback = false) {
+  getLeadsheetVae(url, restart = true) {
     fetch(url, {
       headers: {
         'content-type': 'application/json'
@@ -150,54 +140,52 @@ class App extends Component {
       method: 'GET', // *GET, POST, PUT, DELETE, etc.
     })
       .then(r => r.json())
-      .then(d => {
-        this.changeMatrix(d['result']);
-        this.changeLatent(d['latent']);
+      .then(r => {
+
+        this.changeMatrix(r['melody']);
+        this.changeChords(r['chord']);
+        // this.changeLatent(r['z'][0].slice(0, 32));
+        this.changeLatent(r['z'][0]);
+
+        this.bpms = r['tempo'];
         if (restart) {
+          console.log('start sound');
           this.start();
+          this.sound.changeSection(0);
+          this.renderer.triggerStartAnimation();
         }
-        if (callback) {
-          this.onGetDrumVaeComplete();
+
+        if (this.renderer.instructionState === 0) {
+          this.renderer.pianorollGrids[0].showingInstruction = true;
         }
+
+        this.setState({
+          songs: r['songnames'],
+          loading: false,
+          rhythmThreshold: r['theta'],
+          waitingServer: false,
+        });
       })
       .catch(e => console.log(e));
   }
 
-  onGetDrumVaeComplete() {
-    const { waitingServer } = this.state;
-    if (waitingServer) {
-      this.renderer.latentGraph.showIndication = false;
-
-      if (this.diffAnimation) {
-        this.diffAnimation.start();
-      }
-
-      this.renderer.latentGraph.aniChange().start();
-      this.setState({
-        waitingServer: false,
-      });
-    }
+  getLeadsheetVaeStatic(restart = true) {
+    const url = this.leadsheetServerUrl + 'static';
+    this.getLeadsheetVae(url, restart);
   }
 
-  getDrumVaeRandom() {
+  getLeadsheetVaeRandom() {
     this.renderer.latentGraph.showIndication = true;
     this.setState({
       waitingServer: true,
     });
-    const url = this.serverUrl + 'rand';
-    this.getDrumVae(url, true, true);
+    const randId = Math.floor(Math.random() * 60);
+    console.log(`random id: ${randId}`);
+    const url = this.leadsheetServerUrl + `static/${randId}`;
+    this.getLeadsheetVae(url, restart);
   }
 
-  getDrumVaeStatic() {
-    this.renderer.latentGraph.showIndication = true;
-    this.setState({
-      waitingServer: true,
-    });
-    const url = this.serverUrl + 'static';
-    this.getDrumVae(url, false, true);
-  }
-
-  postDrumVae(url, body, restart = false) {
+  postLeadsheetVae(url, body, restart = false) {
     fetch(url, {
       method: 'POST', // *GET, POST, PUT, DELETE, etc.
       headers: {
@@ -207,9 +195,11 @@ class App extends Component {
       body,
     })
       .then(r => r.json())
-      .then(d => {
-        this.changeMatrix(d['result']);
-        this.changeLatent(d['latent']);
+      .then(r => {
+        this.changeMatrix(r['melody']);
+        this.changeChords(r['chord']);
+        this.changeLatent(r['z'][0]);
+        // console.log(r);
         if (restart) {
           this.start();
         }
@@ -217,24 +207,28 @@ class App extends Component {
       .catch(e => console.log(e));
   }
 
-  postDrumVaeAdjustLatent(latent, restart = false) {
-    const url = this.serverUrl + 'adjust-latent';
-    const body = JSON.stringify({ latent });
-    this.postDrumVae(url, body, false);
+  postLeadsheetVaeAdjustLatent(latent, restart = false) {
+    const url = this.leadsheetServerUrl + 'api/latent2seq';
+    const body = JSON.stringify({
+      'z_client': [ latent ],
+    });
+    this.postLeadsheetVae(url, body, false);
   }
-
-  postDrumVaeAdjustData(data, restart = false) {
-    const url = this.serverUrl + 'adjust-data';
-    const body = JSON.stringify({ data });
-    this.postDrumVae(url, body, false);
-  }
-
 
   // Utilities
   start() {
-    this.samplesManager.start();
+    this.sound.start();
+    this.renderer.playing = true;
     this.setState({
       playing: true,
+    });
+  }
+
+  trigger() {
+    const playing = this.sound.trigger();
+    this.renderer.playing = playing;
+    this.setState({
+      playing,
     });
   }
 
@@ -250,7 +244,7 @@ class App extends Component {
       loadingProgress: amt,
     });
     if (amt === 8) {
-      // const playing = this.samplesManager.trigger();
+      const playing = this.samplesManager.trigger();
       this.setState({
         // playing,
         loadingSamples: false,
@@ -282,27 +276,6 @@ class App extends Component {
     const { slash, open } = this.state;
     if (!slash && !open) {
       const [dragging, onGrid] = this.renderer.handleMouseDown(e);
-      if (onGrid) {
-        const [i, j_reverse] = this.renderer.mouseOnIndex;
-        const j = 8 - j_reverse;
-        this.rawMatrix[i][j] = (this.rawMatrix[i][j] < this.state.gate ? 1 : 0);
-        this.changeMatrix();
-        this.diffAnimation.start();
-        this.samplesManager.triggerSoundEffect(0);
-        this.pauseChangeLatent = true;
-        this.renderer.encoderAniStart(() => {
-          // this.start();
-          if (!this.pauseChangeLatent) {
-            this.renderer.latent = this.tempLatent;
-          }
-          this.pauseChangeLatent = false;
-        });
-        this.postDrumVaeAdjustData(this.rawMatrix);
-
-        if (this.state.instructionStage === 1) {
-          this.nextInstruction();
-        }
-      }
       if (dragging) {
         this.setState({
           dragging,
@@ -330,9 +303,11 @@ class App extends Component {
           }
           this.pauseChangeMatrix = false;
           this.updateMatrix();
+          this.updateChords();
         });
 
-        this.postDrumVaeAdjustLatent(latent);
+        // this.postDrumVaeAdjustLatent(latent);
+        this.postLeadsheetVaeAdjustLatent(latent);
 
         if (this.state.instructionStage === 0) {
           this.nextInstruction();
@@ -362,7 +337,7 @@ class App extends Component {
         // console.log(`key: ${e.keyCode}`);
         if (e.keyCode === 32) {
           // space
-          const playing = this.samplesManager.trigger();
+          const playing = this.sound.trigger();
           this.setState({
             playing,
           });
@@ -373,11 +348,11 @@ class App extends Component {
         }
         if (e.keyCode === 82) {
           // r
-          this.getDrumVaeRandom();
+          this.getLeadsheetVaeRandom();
         }
         if (e.keyCode === 84) {
           // t
-          this.getDrumVaeStatic();
+          this.getLeadsheetVaeStatic();
         }
 
 
@@ -427,11 +402,11 @@ class App extends Component {
     const bpm = v;
     console.log(`bpm changed: ${bpm}`);
     this.setState({ bpm });
-    this.samplesManager.changeBpm(bpm);
+    this.sound.changeBpm(bpm);
   }
 
   handleClickPlayStopIcon() {
-    const playing = this.samplesManager.trigger();
+    const playing = this.sound.trigger();
     this.setState({
       playing,
     });
@@ -452,9 +427,9 @@ class App extends Component {
 
   // Render
   update() {
-    const b = this.samplesManager.beat;
-    if (!this.state.loadingSamples) {
-      this.renderer.draw(this.state.screen, b);
+    const { beat, barIndex, sectionIndex } = this.sound;
+    if (!this.state.loading) {
+      this.renderer.draw(this.state.screen, sectionIndex, barIndex, beat);
     }
 
     TWEEN.update();
@@ -462,8 +437,8 @@ class App extends Component {
   }
 
   render() {
-    const { loadingProgress, instructionStage, gate, bpm } = this.state;
-    const loadingText = (loadingProgress < 9) ? `loading..${loadingProgress}/9` : 'play';
+    const { instructionStage, gate, bpm } = this.state;
+    const loadingText = 'play';
     return (
       <div>
 
@@ -472,12 +447,12 @@ class App extends Component {
           <div className={styles.wrapper}>
             <h1>Latent<br/>Inspector</h1>
             <h2>
-              = 🥁 Drum + 🤖 VAE
+              = 🎹 Song + 🤖 VAE
             </h2>
             <div className="device-supported">
               <p className={styles.description}>
                 An interactive demo based on latent vector to generate drum pattern.
-                Modify the 32-dim latent vector to produce new drum patterns, and vice versa.
+                Modify the 304-dim latent vector to produce new drum patterns.
               </p>
 
               <button
@@ -491,7 +466,7 @@ class App extends Component {
               <p className={styles.builtWith}>
                 Built with tone.js + Flask.
                 <br />
-                Learn more about <a className={styles.about} target="_blank" href="https://github.com/vibertthio/drum-vae-client">how it works.</a>
+                Learn more about <a className={styles.about} target="_blank" href="https://github.com/vibertthio">how it works.</a>
               </p>
 
               <p>Made by</p>
@@ -504,8 +479,8 @@ class App extends Component {
             </a>
           </div>
           <div className={styles.privacy}>
-            <a href="https://github.com/vibertthio/drum-vae-client" target="_blank">Privacy &amp; </a>
-            <a href="https://github.com/vibertthio/drum-vae-client" target="_blank">Terms</a>
+            <a href="https://github.com/vibertthio" target="_blank">Privacy &amp; </a>
+            <a href="https://github.com/vibertthio" target="_blank">Terms</a>
           </div>
         </section>
 
@@ -524,9 +499,8 @@ class App extends Component {
 
           <div className={styles.tips} id="tips">
             {instructionStage < 2 ? <p>🙋‍♀️Tips</p> : ''}
-            {instructionStage === 0 ? (<p>👇Drag the <font color="#ff6464">red dots</font> in the latent vector</p>) : ''}
-            {instructionStage === 1 ? (<p>👇Click on the <font color="#2ecc71">drum patterns</font> to test the encoder</p>) : ''}
-            {instructionStage === 2 ? <p>🎉Have fun!</p> : ''}
+            {instructionStage === 0 ? (<p>👇Drag the <font color="#2ecc71">green dots</font> in the latent vector</p>) : ''}
+            {instructionStage > 0 ? <p>🎉Have fun!</p> : ''}
           </div>
         </div>
 
@@ -544,7 +518,7 @@ class App extends Component {
         <div className={styles.control}>
           <div className={styles.slider}>
             <div>
-              <input type="range" min="1" max="100" value={gate * 100} onChange={this.handleChangeGateValue.bind(this)}/>
+              <input type="range" min="1" max="100" />
             </div>
             <button onClick={() => this.handleClickPlayStopIcon()} onKeyDown={e => e.preventDefault()}>
               {
@@ -553,7 +527,7 @@ class App extends Component {
                   (<img src={pauseSvg} width="30" height="30" alt="submit" />)
               }
             </button>
-            <button onClick={() => this.getDrumVaeRandom()} onKeyDown={e => e.preventDefault()}>
+            <button onClick={() => this.getLeadsheetVaeRandom()} onKeyDown={e => e.preventDefault()}>
               <img src={shufflePng} width="25" height="25" alt="shuffle" />
             </button>
             <div>

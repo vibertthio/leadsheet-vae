@@ -6,13 +6,13 @@ export default class LatentGraph {
     this.renderer = renderer;
     this.TWEEN = renderer.TWEEN;
     this.latent = [];
-    this.dims = 32;
+    this.dims = 300;
     this.graphX = 0;
     this.graphY = 0;
     this.graphRadius = 0;
     this.graphWidth = 0;
     this.graphHeight = 0;
-    this.graphRadiusRatio = 2;
+    this.graphRadiusRatio = 0.2;
 
     this.radiusRatio = rr;
     this.widthRatio = wr;
@@ -21,7 +21,7 @@ export default class LatentGraph {
     this.yShiftRatio = ysr;
 
     this.showDashCircle = true;
-    this.showDiff = true;
+    this.showDiff = false;
     this.showText = true;
     this.showDiagram = false;
     this.showIndication = true;
@@ -29,8 +29,8 @@ export default class LatentGraph {
 
     this.whiteColor = 'rgba(255, 255, 255, 1.0)';
     this.redColor = 'rgba(255, 100, 100, 1.0)';
-    // this.redColor = '#f39c12';
-    // this.orangeColor = '#f39c12';
+    // this.greenColor = '#00b894';
+    this.greenColor = 'rgba(0, 184, 148, 1.0)';
 
     this.mouseIn = false;
     this.blinkAlpha = 0;
@@ -114,7 +114,7 @@ export default class LatentGraph {
           this.graphRadius * Math.sin(angle * i),
         );
         ctx.lineTo(x, y);
-        ctx.strokeStyle = this.redColor;
+        ctx.strokeStyle = this.greenColor;
         ctx.stroke();
       }
 
@@ -145,7 +145,8 @@ export default class LatentGraph {
         ctx.save();
         ctx.beginPath();
         const r = this.graphRadius * 0.3 * (1 - this.blinkAlpha);
-        ctx.strokeStyle = `rgba(255, 100, 100, ${this.blinkAlpha})`;
+        // ctx.strokeStyle = `rgba(255, 100, 100, ${this.blinkAlpha})`;
+        ctx.strokeStyle = `rgba(0, 184, 148, ${this.blinkAlpha})`;
         ctx.arc(0, 0, r, 0, Math.PI * 2, true);
         ctx.stroke();
         ctx.restore()
@@ -159,21 +160,22 @@ export default class LatentGraph {
         let yTextPos = (40 + radius * 0.08) * this.graphWidth / 500;
         let textGap = 5;
 
-        ctx.fillStyle = this.redColor;
+        ctx.fillStyle = this.greenColor;
         ctx.strokeStyle = '#555'
 
-        if (i > 24) {
-          yTextPos *= -1;
-        } else if (i > 16) {
-          xTextPos[0] *= -1;
-          xTextPos[1] *= -1;
-          textGap *= -10;
-          yTextPos *= -1;
-        } else if (i > 8) {
-          xTextPos[0] *= -1;
-          xTextPos[1] *= -1;
-          textGap *= -10;
-        }
+        yTextPos *= -1;
+        // if (i > 24) {
+        //   yTextPos *= -1;
+        // } else if (i > 16) {
+        //   xTextPos[0] *= -1;
+        //   xTextPos[1] *= -1;
+        //   textGap *= -10;
+        //   yTextPos *= -1;
+        // } else if (i > 8) {
+        //   xTextPos[0] *= -1;
+        //   xTextPos[1] *= -1;
+        //   textGap *= -10;
+        // }
         ctx.fillText((Math.round(value * 10000) / 10000).toString(), xTextPos[1] + textGap, yTextPos);
         ctx.beginPath();
         ctx.moveTo(0, 0);
@@ -183,11 +185,12 @@ export default class LatentGraph {
       }
 
       ctx.beginPath();
-      const ratio = (i === selectedLatent) ? 0.04 : 0.03;
+      // const ratio = (i === selectedLatent) ? 0.04 : 0.03;
+      const ratio = (i === selectedLatent) ? 0.02 : 0.015;
       ctx.arc(0, 0, this.graphRadius * ratio, 0, Math.PI * 2, true);
       ctx.fillStyle = '#CCC';
       if (i === selectedLatent) {
-        ctx.fillStyle = this.redColor;
+        ctx.fillStyle = this.greenColor;
       }
       ctx.fill();
 
@@ -195,7 +198,10 @@ export default class LatentGraph {
       if (i === selectedLatent) {
         ctx.beginPath();
         const value = Math.sin(frameCount * 0.05);
-        ctx.strokeStyle = `rgba(255, 100, 100, ${0.5 - 0.2 * value})`;
+
+        // hover effect
+        // ctx.strokeStyle = `rgba(255, 100, 100, ${0.5 - 0.2 * value})`;
+        ctx.strokeStyle = `rgba(0, 184, 148, ${0.5 - 0.2 * value})`;
         ctx.arc(0, 0, this.graphRadius * 0.15 * (1 + 0.3 * value), 0, Math.PI * 2, true);
         ctx.stroke();
       }
@@ -274,7 +280,7 @@ export default class LatentGraph {
     if (!this.fetching) {
       if (this.renderer.frameCount % 20 < 10) {
         ctx.save();
-        ctx.fillStyle = this.redColor;
+        ctx.fillStyle = this.greenColor;
         ctx.translate(-0.5 * w, -0.5 * h);
         ctx.translate(15, 15);
 

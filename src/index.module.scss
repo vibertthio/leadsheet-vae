@@ -1,6 +1,7 @@
 $font-default: monospace, Arial, sans-serif;
 // $link-color: #f39c12;
-$link-color: rgba(255, 100, 100, 1.0);
+$link-color: rgba(0, 184, 148, 1.0);
+$green-color: rgba(0, 184, 148, 1.0);
 $background-color: rgba(15, 15, 15, 1.0);
 
 body {
@@ -122,10 +123,10 @@ body {
 
 
 // Base Colors
-$shade-10: #b33b3b !default;
+$shade-10: #1abc9c !default;
 $shade-1: #d7dcdf !default;
 $shade-0: #fff !default;
-$teal: #1abc9c !default;
+$teal: #89c7bb !default;
 
 $range-width: 100% !default;
 

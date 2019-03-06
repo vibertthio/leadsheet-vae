@@ -8,6 +8,7 @@ export default class NN {
 
     this.whiteColor = renderer.whiteColor;
     this.redColor = renderer.redColor;
+    this.greenColor = renderer.greenColor;
 
 
     this.yShiftIn = 1;
@@ -71,7 +72,7 @@ export default class NN {
       } else {
         amt = this.lessAlpha;
       }
-      ctx.fillStyle = lerpColor('#FFFFFF', '#FF6464', amt);
+      ctx.fillStyle = lerpColor('#FFFFFF', '#00B894', amt);
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, Math.PI * 2, true);
       ctx.fill();
@@ -100,7 +101,7 @@ export default class NN {
       } else {
         amt = this.moreAlpha;
       }
-      ctx.fillStyle = lerpColor('#FFFFFF', '#FF6464', amt);
+      ctx.fillStyle = lerpColor('#FFFFFF', '#00B894', amt);
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, Math.PI * 2, true);
       ctx.fill();
