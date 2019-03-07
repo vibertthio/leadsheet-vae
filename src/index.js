@@ -152,7 +152,7 @@ class App extends Component {
           console.log('start sound');
           this.start();
           this.sound.changeSection(0);
-          this.renderer.triggerStartAnimation();
+          this.renderer.pianorollGrid.triggerStartAnimation();
         }
 
         if (this.renderer.instructionState === 0) {
@@ -182,7 +182,7 @@ class App extends Component {
     const randId = Math.floor(Math.random() * 60);
     console.log(`random id: ${randId}`);
     const url = this.leadsheetServerUrl + `static/${randId}`;
-    this.getLeadsheetVae(url, restart);
+    this.getLeadsheetVae(url);
   }
 
   postLeadsheetVae(url, body, restart = false) {
@@ -325,7 +325,8 @@ class App extends Component {
     if (!this.state.dragging) {
       this.renderer.handleMouseMove(e);
     }
-    this.renderer.handleDraggingOnGraph(e);
+    // this.renderer.handleMouseMoveOnGraph(e);
+    this.renderer.handleMouseMoveOnHistogram(e);
   }
 
   // 2. Key
@@ -452,7 +453,7 @@ class App extends Component {
             <div className="device-supported">
               <p className={styles.description}>
                 An interactive demo based on latent vector to generate drum pattern.
-                Modify the 304-dim latent vector to produce new drum patterns.
+                Modify the 304-dim latent vector to produce new melodies with harmonization.
               </p>
 
               <button
@@ -498,7 +499,7 @@ class App extends Component {
           </button>
 
           <div className={styles.tips} id="tips">
-            {instructionStage < 2 ? <p>🙋‍♀️Tips</p> : ''}
+            {instructionStage < 1 ? <p>🙋‍♀️Tips</p> : ''}
             {instructionStage === 0 ? (<p>👇Drag the <font color="#2ecc71">green dots</font> in the latent vector</p>) : ''}
             {instructionStage > 0 ? <p>🎉Have fun!</p> : ''}
           </div>

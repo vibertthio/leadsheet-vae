@@ -1,4 +1,5 @@
 import LatentGraph from './latent-graph';
+import LatentHistogram from './latent-histogram';
 import PianorollGrid from './pianoroll-grid';
 import NN from './nn';
 import { Noise } from 'noisejs';
@@ -51,7 +52,7 @@ export default class Renderer {
     this.gridYShift = 0;
     this.mouseOnIndex = [-1, -1];
 
-    this.latentGraph = new LatentGraph(this);
+    this.latentGraph = new LatentHistogram(this);
     this.decoder = new NN(this);
     this.encoder = new NN(this);
 
@@ -82,7 +83,7 @@ export default class Renderer {
     this.showingLatents = false;
 
     this.latentGraph.radiusRatio = 0.65;
-    this.latentGraph.widthRatio = 1.0;
+    this.latentGraph.widthRatio = 0.9;
     this.latentGraph.heightRatio = 1.7;
     this.latentGraph.xShiftRatio = 0;
     this.latentGraph.yShiftRatio = 1.0;
@@ -272,6 +273,7 @@ export default class Renderer {
           }
         }
 
+        // drum grid hover effect
         if (
           t === this.mouseOnIndex[0] &&
           d === this.mouseOnIndex[1]
@@ -316,17 +318,18 @@ export default class Renderer {
   }
 
   handleMouseDown(e) {
-    let cx = e.clientX - this.width * 0.5;;
-    let cy = e.clientY - this.height * 0.5;
+    // let cx = e.clientX - this.width * 0.5;;
+    // let cy = e.clientY - this.height * 0.5;
 
     return [
-      this.handleLatentGraphClick(cx, cy),
+      this.handleMouseMoveOnHistogram(e),
       false,
+      // this.handleLatentGraphClick(cx, cy),
       // this.handleMouseDownOnGrid(),
     ];
   }
 
-  handleDraggingOnGraph(e) {
+  handleMouseMoveOnGraph(e) {
     const { dragging } = this.app.state;
     const { graphX, graphY, graphRadius, graphRadiusRatio } = this.latentGraph;
     const r = Math.pow(this.dist, 2);
@@ -346,6 +349,27 @@ export default class Renderer {
       }
     }
   }
+
+  handleMouseMoveOnHistogram(e) {
+    const { dragging } = this.app.state;
+    const { graphX, graphY, graphRadius, graphRadiusRatio, graphWidth, graphHeight } = this.latentGraph;
+    const r = Math.pow(this.dist, 2);
+    let x = e.clientX - this.width * 0.5;
+    let y = e.clientY - this.height * 0.5;
+
+    if (Math.abs(x - graphX) < graphWidth * 0.5 && Math.abs(y - graphY) < graphHeight * 0.5) {
+      if (dragging) {
+        const d = -1 * (y - graphY);
+        const v = lerp(d, 0, graphHeight * this.latentGraph.histogramHeightRatio, 0, 1);
+        this.latent[this.selectedLatent] = v;
+      } else {
+        this.selectedLatent = Math.floor(((x + graphWidth * 0.5) / this.latentGraph.graphWidth) * this.latent.length);
+      }
+      return true;
+    }
+    return false;
+  }
+
 
   handleMouseMove(e) {
     this.latentGraph.handleMouseMove(e);
