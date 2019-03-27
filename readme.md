@@ -8,7 +8,8 @@
 
 
 <p align="center">
-  <img src="./assets/sc-01.png" height="600px"/>
+  <img src="./assets/sc-02.png" height="600px"/>
 </p>
+
 
 
