@@ -49,7 +49,9 @@ class App extends Component {
     this.diffAnimationAlpha = 0;
 
     this.serverUrl = 'http://musicai.citi.sinica.edu.tw/drumvae/';
-    this.leadsheetServerUrl = 'http://140.109.135.76:5001/';
+    // this.leadsheetServerUrl = 'http://140.109.135.76:5001/';
+    this.leadsheetServerUrl = 'http://musicai.citi.sinica.edu.tw/leadsheetvae/';
+    // this.leadsheetServerUrl = 'http://140.109.21.193:5004/';
 
 
     // animation
